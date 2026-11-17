@@ -1,6 +1,6 @@
 # PGO
 
-Use a fresh build directory configured as in the root README, with `BENCH_PASS=none` and `BENCH_OPT_LEVEL=3`. Match the LTO setting of the baseline. Replace the executable and inputs for the selected benchmark.
+Настрой новый каталог `build-pgo` по корневому README с параметрами `-DBENCH_PASS=none -DBENCH_OPT_LEVEL=3`. Используй ту же настройку LTO, что и в базовой сборке. Подставь исполняемый файл и входные данные выбранного бенчмарка.
 
 ```sh
 profile_dir="$(mktemp -d)"

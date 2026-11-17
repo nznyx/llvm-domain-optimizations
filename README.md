@@ -1,8 +1,8 @@
 # llvm-domain-optimizations
 
-Domain-specific LLVM optimizations through static hot/cold path analysis, in collaboration with Spectral::Technologies.
+Доменно-специфичные оптимизации LLVM на основе статического анализа горячих и холодных путей. Проект выполняется совместно с Spectral::Technologies.
 
-Linux, CMake 3.27+, LLVM/Clang 18.1 with development headers, LLD 18 for Full LTO. Beast also needs Boost 1.90 headers.
+Для сборки нужны Linux, CMake 3.27+ и LLVM/Clang 18.1 с заголовками. Для Full LTO нужен LLD 18, для Beast — заголовки Boost 1.90.
 
 ```sh
 cmake -S . -B build -DCMAKE_C_COMPILER=clang-18 -DCMAKE_CXX_COMPILER=clang++-18 \
@@ -11,7 +11,7 @@ cmake --build build -j
 ./build/libyaml-bench 20 input.yaml
 ```
 
-Choose `BENCHMARK=beast|libcsv|libyaml`, `BENCH_PASS=none|error|x86-layout` and `BENCH_OPT_LEVEL=2|3`. Use separate build directories for comparisons. For the x86 layout baseline use `BENCH_PASS=none -DBENCH_LTO=ON`. Both layout builds use Full LTO on Linux x86-64.
+Выбери бенчмарк через `BENCHMARK=beast|libcsv|libyaml`, проход через `BENCH_PASS=none|error|x86-layout` и уровень оптимизации через `BENCH_OPT_LEVEL=2|3`. Для сравнения используй отдельные каталоги сборки. Базовая сборка для сравнения с `x86-layout` задаётся флагами `-DBENCH_PASS=none -DBENCH_LTO=ON`. Обе сборки используют Full LTO на Linux x86-64.
 
 ```sh
 ./build/beast-bench
@@ -20,4 +20,4 @@ Choose `BENCHMARK=beast|libcsv|libyaml`, `BENCH_PASS=none|error|x86-layout` and 
 ctest --test-dir build --output-on-failure
 ```
 
-Run the executable for the selected benchmark. ErrorHeuristic checks use Python 3. For a standalone IR run, use `opt-18 -load-pass-plugin=build/ErrorHeuristic.so -passes=error-names,verify -S input.ll -o marked.ll`. See [Beast setup](bench/beast/README.md) and [PGO commands](bench/PGO.md).
+Запускай исполняемый файл выбранного бенчмарка. Для проверок ErrorHeuristic нужен Python 3. Чтобы запустить проход на готовом LLVM IR, используй `opt-18 -load-pass-plugin=build/ErrorHeuristic.so -passes=error-names,verify -S input.ll -o marked.ll`. [Настройка Beast](bench/beast/README.md) · [Команды для PGO](bench/PGO.md).
