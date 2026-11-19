@@ -7,4 +7,6 @@ FetchContent_MakeAvailable(libcsv)
 
 add_executable(libcsv-bench benchmark.cpp "${libcsv_SOURCE_DIR}/libcsv.c")
 target_include_directories(libcsv-bench PRIVATE "${libcsv_SOURCE_DIR}")
-configure_benchmark(libcsv-bench)
+configure_benchmark(libcsv-bench "${libcsv_SOURCE_DIR}/libcsv.c")
+
+bench_inputs(data/navaids.csv data/airports.csv data/runways.csv)

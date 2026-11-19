@@ -7,7 +7,9 @@
 #include <optional>
 
 namespace llvm {
+class BasicBlock;
 class CallBase;
+class Value;
 }
 
 struct ErrorHeuristicOptions {

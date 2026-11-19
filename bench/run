@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+set -euo pipefail
+usage() {
+  echo 'Usage: bench/run {beast|fix|gzip|libcsv|libyaml|pugixml} {train|a|b|FILE} {O2|O3|PGO} [error,x86-layout]' >&2
+  exit 2
+}
+(( $# == 3 || $# == 4 )) || usage
+root=$(cd "$(dirname "$0")/.." && pwd)
+bench=$1 input=$2 mode=$3 passes=${4:-none}
+[[ $bench =~ ^[a-z0-9-]+$ && -f "$root/bench/$bench/CMakeLists.txt" ]] || usage
+case $mode in O2|O3|PGO) ;; *) usage ;; esac
+[[ $passes =~ ^[a-z][a-z0-9-]*(,[a-z][a-z0-9-]*)*$ ]] || usage
+
+config=${LLVM_CONFIG:-llvm-config}
+tools=$("$config" --bindir)
+base="$root/build/$("$config" --version)/$bench"
+build="$base/$mode-$passes"
+common=(-S "$root" "-DLLVM_DIR=$("$config" --cmakedir)" "-DCMAKE_C_COMPILER=$tools/clang"
+  "-DCMAKE_CXX_COMPILER=$tools/clang++" "-DFETCHCONTENT_BASE_DIR=$root/build/deps"
+  "-DBENCHMARK=$bench" -DBENCH_LTO=ON "-DBENCH_PASS=$passes")
+if [[ -n ${LLD:-} ]]; then common+=("-DLLD_EXECUTABLE=$LLD"); fi
+
+compile() {
+  local dir=$1
+  shift
+  cmake "${common[@]}" -B "$dir" "$@" >&2
+  cmake --build "$dir" --target "$bench-bench" --parallel "${JOBS:-4}" >&2
+}
+level=${mode#O}
+profile=
+if [[ $mode == PGO ]]; then
+  level=3
+  train="$base/train-$passes"
+  compile "$train" -DBENCH_OPT_LEVEL=3 "-DBENCH_CXX_FLAGS=${BENCH_FLAGS:-} -fprofile-generate" \
+    "-DBENCH_LINK_FLAGS=${LINK_FLAGS:-} -fprofile-generate"
+  raw=$(mktemp -d "$train/profile.XXXXXX")
+  trap 'rm -rf -- "$raw"' EXIT
+  LLVM_PROFILE_FILE="$raw/train.profraw" "$train/$bench-bench" 20 "$train/inputs/train" >&2
+  "$tools/llvm-profdata" merge "$raw/train.profraw" -o "$raw/train.profdata"
+  profile="$train/train.profdata"
+  cmake -E copy_if_different "$raw/train.profdata" "$profile"
+fi
+compile "$build" "-DBENCH_OPT_LEVEL=$level" "-DBENCH_PROFILE=$profile" \
+  "-DBENCH_CXX_FLAGS=${BENCH_FLAGS:-}" "-DBENCH_LINK_FLAGS=${LINK_FLAGS:-}"
+case $input in train|a|b) input="$build/inputs/$input" ;; esac
+"$build/$bench-bench" "${REPEATS:-20}" "$input"

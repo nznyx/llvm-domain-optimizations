@@ -1,6 +1,10 @@
 #include "ErrorHeuristic.hpp"
 #include "llvm/Passes/PassBuilder.h"
+#if __has_include("llvm/Plugins/PassPlugin.h")
+#include "llvm/Plugins/PassPlugin.h"
+#else
 #include "llvm/Passes/PassPlugin.h"
+#endif
 
 using namespace llvm;
 

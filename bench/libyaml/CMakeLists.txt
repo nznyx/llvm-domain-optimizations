@@ -16,4 +16,12 @@ list(TRANSFORM sources PREPEND "${libyaml_SOURCE_DIR}/src/")
 add_executable(libyaml-bench benchmark.cpp ${sources})
 target_include_directories(libyaml-bench PRIVATE "${libyaml_SOURCE_DIR}/include" "${CMAKE_CURRENT_BINARY_DIR}")
 target_compile_definitions(libyaml-bench PRIVATE HAVE_CONFIG_H YAML_DECLARE_STATIC)
-configure_benchmark(libyaml-bench)
+configure_benchmark(libyaml-bench ${sources})
+
+set(crds https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/v1.2.0/config/crd/standard)
+file(DOWNLOAD "${crds}/gateway.networking.k8s.io_gateways.yaml" "${FETCHCONTENT_BASE_DIR}/gateways.yaml"
+     EXPECTED_HASH SHA256=8a8f1c3f0e54c667ad68982ad1d98ff3397fc4ce19917efc19ae2c76bda61cb7 TLS_VERIFY ON)
+file(DOWNLOAD "${crds}/gateway.networking.k8s.io_httproutes.yaml" "${FETCHCONTENT_BASE_DIR}/httproutes.yaml"
+     EXPECTED_HASH SHA256=f8aff76af966cadfbf505776a5fb9f54f9ea3dccf3783c51468318e30d779416 TLS_VERIFY ON)
+bench_inputs("${libyaml_SOURCE_DIR}/.travis.yml"
+             "${FETCHCONTENT_BASE_DIR}/gateways.yaml" "${FETCHCONTENT_BASE_DIR}/httproutes.yaml")

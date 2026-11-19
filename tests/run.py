@@ -10,8 +10,10 @@ parser.add_argument('--llvm', type=Path, required=True)
 parser.add_argument('--plugin', type=Path, required=True)
 parser.add_argument('--beast', type=Path)
 parser.add_argument('--out', type=Path, required=True)
-parser.add_argument('--boost', type=Path, default=Path('/opt/homebrew/include'))
+parser.add_argument('--boost', type=Path)
 args = parser.parse_args()
+if args.beast and not args.boost:
+    parser.error("--beast requires --boost")
 root = Path(__file__).resolve().parents[1]
 out = args.out
 out.mkdir(parents=True, exist_ok=True)
@@ -43,7 +45,7 @@ assert (out/'effects-only.ll').read_text().count('!prof') == 1
 print('PASS: core IR checks and independent rule selection')
 if args.beast is None:
     raise SystemExit(0)
-common = [clang, '-std=c++17', '-O3', '-g', '-I', args.boost, root/'tests/checks.cpp']
+common = [clang, '-std=c++20', '-O3', '-g', '-I', args.boost, root/'tests/checks.cpp']
 run(*common, '-Xclang', '-disable-llvm-passes', '-S', '-emit-llvm', '-o', out/'raw.ll')
 run(opt, '-load-pass-plugin', args.plugin, '-passes=error-heuristic,verify', '-S', out/'raw.ll', '-o', out/'marked.ll')
 ir = (out/'marked.ll').read_text()
@@ -93,12 +95,12 @@ assert (out/'twice.ll').read_text().split('\n', 1)[1] == ir.split('\n', 1)[1]
 run(*common, '-o', out/'baseline')
 run(*common, '-fpass-plugin='+str(args.plugin), '-o', out/'plugin')
 assert run(out/'baseline') == run(out/'plugin')
-beast_common = [clang, '-std=c++17', '-O3', '-g', '-I', args.beast/'include', '-I', args.boost, root/'tests/beast_checks.cpp']
+beast_common = [clang, '-std=c++20', '-O3', '-g', '-I', args.beast/'include', '-I', args.boost, root/'tests/beast_checks.cpp']
 run(*beast_common, '-o', out/'beast-baseline')
 run(*beast_common, '-fpass-plugin='+str(args.plugin), '-o', out/'beast-plugin')
 assert run(out/'beast-baseline') == run(out/'beast-plugin')
 
-assignment_common = [clang, '-std=c++17', '-O3', '-g', '-I', args.beast/'include',
+assignment_common = [clang, '-std=c++20', '-O3', '-g', '-I', args.beast/'include',
                      '-I', args.boost, root/'tests/assignments.cpp']
 run(*assignment_common, '-Xclang', '-disable-llvm-passes', '-S', '-emit-llvm', '-o', out/'assignments-raw.ll')
 for label, pipeline in [('extended', 'error-heuristic'), ('names', 'error-names'), ('effects', 'beast-errors')]:

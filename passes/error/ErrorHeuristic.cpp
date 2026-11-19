@@ -225,6 +225,19 @@ PreservedAnalyses ErrorHeuristic::run(Function &F, FunctionAnalysisManager &) {
   Errors.clear();
   for (auto &BB : F)
     for (auto &I : BB) {
+#if LLVM_VERSION_MAJOR >= 19
+      for (auto &Record : I.getDbgRecordRange()) {
+        auto *D = dyn_cast<DbgVariableRecord>(&Record);
+        if (!D || (!D->isDbgDeclare() && !D->isDbgValue()) ||
+            !errorName(D->getVariable()->getName()) ||
+            D->getNumVariableLocationOps() != 1 || D->isKillLocation() ||
+            D->getExpression()->getNumElements() != 0)
+          continue;
+        auto *V = D->getVariableLocationOp(0);
+        if (V && !isa<Constant>(V))
+          Errors.insert(V);
+      }
+#else
       auto *D = dyn_cast<DbgVariableIntrinsic>(&I);
       if (!D || !errorName(D->getVariable()->getName()) ||
           D->getNumVariableLocationOps() != 1 || D->isKillLocation() ||
@@ -237,6 +250,7 @@ PreservedAnalyses ErrorHeuristic::run(Function &F, FunctionAnalysisManager &) {
         V = DebugValue->getValue();
       if (V && !isa<Constant>(V))
         Errors.insert(V);
+#endif
     }
   unsigned Count = 0, AssignmentCount = 0;
   for (auto &BB : F) {
