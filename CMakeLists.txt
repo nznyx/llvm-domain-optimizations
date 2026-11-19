@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.27)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON CACHE BOOL "Export compilation database")
 project(LLVMDomainOptimizations LANGUAGES C CXX)
 
-find_package(LLVM REQUIRED CONFIG)
+find_package(LLVM 23.1 REQUIRED CONFIG)
 list(APPEND CMAKE_MODULE_PATH "${LLVM_CMAKE_DIR}")
 include(AddLLVM)
 

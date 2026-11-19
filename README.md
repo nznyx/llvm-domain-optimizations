@@ -2,7 +2,7 @@
 
 LLVM-проходы для парсеров. Совместный проект со Spectral::Technologies.
 
-Нужны Linux x86-64, CMake ≥ 3.27, Python 3, gzip и LLVM с Clang, LLD, compiler-rt и заголовками. Выбери установленный LLVM и запусти один бенчмарк.
+Нужны Linux x86-64, CMake ≥ 3.27, Python 3, gzip и LLVM 23.1.x с Clang, LLD, compiler-rt и заголовками.
 
 ```sh
 export LLVM_CONFIG=llvm-config-23

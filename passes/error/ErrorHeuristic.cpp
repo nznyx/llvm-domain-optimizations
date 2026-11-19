@@ -4,7 +4,7 @@
 #include "llvm/Demangle/Demangle.h"
 #include "llvm/IR/DebugInfo.h"
 #include "llvm/IR/Instructions.h"
-#include "llvm/IR/IntrinsicInst.h"
+#include "llvm/IR/DebugProgramInstruction.h"
 #include "llvm/IR/MDBuilder.h"
 #include "llvm/Support/raw_ostream.h"
 #include <cctype>
@@ -119,8 +119,8 @@ ErrorHeuristic::Outcome ErrorHeuristic::edgeOutcome(BasicBlock *BB) const {
           Result = *O;
     if (isa<ReturnInst>(BB->getTerminator()))
       return Result;
-    auto *B = dyn_cast<BranchInst>(BB->getTerminator());
-    if (!B || !B->isUnconditional())
+    auto *B = dyn_cast<UncondBrInst>(BB->getTerminator());
+    if (!B)
       return Outcome::Unknown;
     BB = B->getSuccessor(0);
   }
@@ -225,7 +225,6 @@ PreservedAnalyses ErrorHeuristic::run(Function &F, FunctionAnalysisManager &) {
   Errors.clear();
   for (auto &BB : F)
     for (auto &I : BB) {
-#if LLVM_VERSION_MAJOR >= 19
       for (auto &Record : I.getDbgRecordRange()) {
         auto *D = dyn_cast<DbgVariableRecord>(&Record);
         if (!D || (!D->isDbgDeclare() && !D->isDbgValue()) ||
@@ -237,25 +236,11 @@ PreservedAnalyses ErrorHeuristic::run(Function &F, FunctionAnalysisManager &) {
         if (V && !isa<Constant>(V))
           Errors.insert(V);
       }
-#else
-      auto *D = dyn_cast<DbgVariableIntrinsic>(&I);
-      if (!D || !errorName(D->getVariable()->getName()) ||
-          D->getNumVariableLocationOps() != 1 || D->isKillLocation() ||
-          D->getExpression()->getNumElements() != 0)
-        continue;
-      Value *V = nullptr;
-      if (auto *Declare = dyn_cast<DbgDeclareInst>(D))
-        V = Declare->getAddress();
-      else if (auto *DebugValue = dyn_cast<DbgValueInst>(D))
-        V = DebugValue->getValue();
-      if (V && !isa<Constant>(V))
-        Errors.insert(V);
-#endif
     }
   unsigned Count = 0, AssignmentCount = 0;
   for (auto &BB : F) {
-    auto *B = dyn_cast<BranchInst>(BB.getTerminator());
-    if (!B || !B->isConditional() || B->getMetadata(LLVMContext::MD_prof))
+    auto *B = dyn_cast<CondBrInst>(BB.getTerminator());
+    if (!B || B->getMetadata(LLVMContext::MD_prof))
       continue;
     std::optional<bool> P;
     if (Options.BeastErrors) {
