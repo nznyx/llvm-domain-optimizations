@@ -1,0 +1,25 @@
+include(../Lexer.cmake)
+lexer_source(jq_lexer https://github.com/jqlang/jq/releases/download/jq-1.8.1/jq-1.8.1.tar.gz
+  2be64e7129cecb11d5906290eba10af694fb9e3e7f9fc208a311dc33ca837eb0)
+set(src "${source}/src")
+set(runtime jv.c jv_alloc.c jv_aux.c jv_dtoa.c jv_dtoa_tsd.c jv_parse.c jv_print.c jv_unicode.c util.c)
+list(TRANSFORM runtime PREPEND "${src}/")
+lexer_benchmark("${src}/lexer.c" ${runtime} "${source}/vendor/decNumber/decContext.c"
+  "${source}/vendor/decNumber/decNumber.c")
+target_include_directories(jq-bench PRIVATE "${src}" "${source}/vendor")
+target_compile_definitions(jq-bench PRIVATE USE_DECNUM HAVE_PTHREAD_KEY_CREATE HAVE_PTHREAD_ONCE HAVE_ATEXIT)
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  target_compile_definitions(jq-bench PRIVATE _GNU_SOURCE HAVE_MEMMEM)
+  # util.c serves both the lexer and the interpreter. Drop the unused CLI
+  # functions even when profile instrumentation keeps their object file alive.
+  target_compile_options(jq-bench PRIVATE -ffunction-sections -fdata-sections)
+  target_link_options(jq-bench PRIVATE "LINKER:--gc-sections")
+endif()
+if(CMAKE_C_BYTE_ORDER STREQUAL "BIG_ENDIAN")
+  target_compile_definitions(jq-bench PRIVATE IEEE_MC68k)
+else()
+  target_compile_definitions(jq-bench PRIVATE IEEE_8087)
+endif()
+find_package(Threads REQUIRED)
+target_link_libraries(jq-bench PRIVATE m Threads::Threads)
+bench_inputs("${source}/tests/modules/c/c.jq" "${src}/builtin.jq" "${source}/tests/utf8-truncate.jq")

@@ -1,4 +1,4 @@
-"""Check the four replay drivers against tiny inputs with known results."""
+"""Check the replay drivers against tiny inputs with known results."""
 import gzip
 from pathlib import Path
 import subprocess
@@ -19,6 +19,24 @@ cases = {
              gzip.compress(payload)[:-3]),
     "pugixml": (b"<book><row/><x/></book>", 10, b"<book><row></book>"),
 }
+# A literal inserted by the first HPACK block is referenced by the second.
+literal = b"\x40\x03foo\x03bar"
+hpack = len(literal).to_bytes(4, "big") + literal + b"\0\0\0\x01\xbe"
+# QPACK request stream 4, static indexed field 17 (:method = GET).
+qpack = (4).to_bytes(8, "big") + b"\0\0\0\x03\0\0\xd1"
+timestamp = 0x010203040506
+itch = b"\0\x0cS\0\x08\0\x05" + timestamp.to_bytes(6, "big") + b"O"
+cases.update({
+    "itch": (itch, ord("S") + 8 + 5 + timestamp, itch[:-1]),
+    "hpack": (hpack, 2 * (1 + 17*3 + 31*3 + ord("f") + ord("r")), hpack[:-1]),
+    "qpack": (qpack, 1 + 17*7 + 31*3 + ord(":") + ord("T"), qpack[:-1]),
+    "cmake": (b"set(X 5)\n", 1931184685065656369, b"set(\0)"),
+    "graphviz": (b"graph G { a -- b }", 1666928691464328521, b"graph G {\0}"),
+    "jq": (b"map(.answer + 1)", 6584319999539237029, b".\0"),
+    "libconfig": (b"flag = true;", 7412181703446, b"flag = \0;"),
+})
+for library in ("cjson", "parson", "picojson", "json11", "jansson", "boost-json"):
+    cases[library] = (b'{"a":[1,{"n":2}],"b":"word"}', 3, b'{"a":[1,2}]')
 data, expected, malformed = cases[name]
 with tempfile.TemporaryDirectory() as tmp:
     file = Path(tmp)/"input"

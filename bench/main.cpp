@@ -7,7 +7,12 @@
 #include <string>
 #include <string_view>
 
+// json11 takes a std::string by reference. Keep its input copy outside the timer.
+#ifdef BENCH_STRING_INPUT
+std::uint64_t parse(const std::string &input);
+#else
 std::uint64_t parse(std::string_view input);
+#endif
 
 int main(int argc, char **argv) try {
     if (argc < 3) throw std::runtime_error("usage: BENCH REPEATS FILE [FILE ...]");

@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 usage() {
-  echo 'Usage: bench/run {beast|fix|gzip|libcsv|libyaml|pugixml} {train|a|b|FILE} {O2|O3|PGO} [error,x86-layout]' >&2
+  echo 'Usage: bench/run BENCHMARK {train|a|b|FILE} {O2|O3|PGO} [PASS,...]' >&2
+  echo 'Passes: error, parser-hot-inline, transition-split, x86-layout' >&2
   exit 2
 }
 (( $# == 3 || $# == 4 )) || usage

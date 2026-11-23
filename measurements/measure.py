@@ -1,4 +1,4 @@
-"""Build selected benchmarks, then time the six configurations on the same Linux CPU."""
+"""Build selected benchmarks, then time all configurations on the same Linux CPU."""
 import argparse
 import csv
 import hashlib
@@ -11,14 +11,23 @@ import sys
 import tempfile
 
 root = Path(__file__).resolve().parents[1]
+all_passes = "error,parser-hot-inline,transition-split,x86-layout"
 modes = [("O2", "none"), ("O3", "none"), ("O3", "error"), ("O3", "x86-layout"),
-         ("O3", "error,x86-layout"), ("PGO", "none")]
+         ("O3", "parser-hot-inline"), ("O3", "transition-split"),
+         ("O3", "error,x86-layout"), ("O3", all_passes), ("PGO", "none")]
 
 parser = argparse.ArgumentParser(description=__doc__)
-parser.add_argument("benchmarks", nargs="+",
-                    choices=sorted(p.parent.name for p in (root/"bench").glob("*/CMakeLists.txt")))
+available = sorted(p.parent.name for p in (root/"bench").glob("*/CMakeLists.txt"))
+parser.add_argument("benchmarks", nargs="+", choices=[*available, "all"])
 parser.add_argument("--cpu", type=int, required=True)
+phase = parser.add_mutually_exclusive_group()
+phase.add_argument("--build-only", action="store_true", help="prepare all binaries without timing")
+phase.add_argument("--skip-build", action="store_true", help="time binaries already prepared by --build-only")
 args = parser.parse_args()
+if args.benchmarks == ["all"]:
+    args.benchmarks = available
+elif "all" in args.benchmarks:
+    parser.error("use all by itself or pass benchmark names")
 config = os.environ.get("LLVM_CONFIG", "llvm-config")
 version = subprocess.check_output([config, "--version"], text=True).strip()
 tools = Path(subprocess.check_output([config, "--bindir"], text=True).strip())
@@ -41,13 +50,22 @@ binaries = {}
 with tempfile.TemporaryDirectory() as tmp:
     section = Path(tmp) / "text"
     for bench in args.benchmarks:
+        expected_inputs = None
         for mode, passes in modes:
-            subprocess.run([root/"bench/run", bench, "a", mode, passes],
-                           env={**os.environ, "REPEATS": "1"}, stdout=sys.stderr, check=True)
+            if not args.skip_build:
+                subprocess.run([root/"bench/run", bench, "a", mode, passes],
+                               env={**os.environ, "REPEATS": "1"}, stdout=sys.stderr, check=True)
             binary = base/bench/f"{mode}-{passes}"/f"{bench}-bench"
+            hashes = tuple(sha(binary.parent/"inputs"/label) for label in ("train", "a", "b"))
+            if len(set(hashes)) != 3 or (expected_inputs is not None and hashes != expected_inputs):
+                raise ValueError(f"inconsistent train/a/b inputs for {bench} {mode} {passes}")
+            expected_inputs = hashes
             subprocess.run([tools/"llvm-objcopy", "-O", "binary", "--only-section=.text",
                             binary, section], check=True)
             binaries[bench, mode, passes] = (binary, sha(section))
+
+if args.build_only:
+    sys.exit(0)
 
 os.sched_setaffinity(0, {args.cpu})
 topology = Path(f"/sys/devices/system/cpu/cpu{args.cpu}/topology/thread_siblings_list")
@@ -70,7 +88,7 @@ for bench in args.benchmarks:
         one, _ = sample(binary, 8, data)
         repeats = max(1, math.ceil(8 * 150 / one))
         _, expected = sample(binary, repeats, data)
-        for round_id in range(12):
+        for round_id in range(2 * len(modes)):
             offset = round_id % len(modes)
             if offset == 0:
                 order = modes.copy()
